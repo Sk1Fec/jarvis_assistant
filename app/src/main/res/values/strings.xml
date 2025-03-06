@@ -1,0 +1,52 @@
+<resources>
+    <string name="app_name">Jarvis Assistant</string>
+    <string name="hint_message">Сообщение для Jarvis...</string>
+    <string name="settings_title">Настройки Jarvis</string>
+    <string name="permissions_button">Предоставить все разрешения</string>
+    <string name="background_permission">Продолжить работу в неактивных периодах</string>
+    <string name="user_prefix">Вы: </string>
+    <string name="jarvis_prefix">Jarvis: </string>
+    <string name="clear_chat">Очистить чат</string>
+
+    <string-array name="greeting_responses">
+        <item>Привет, господин! Чем могу помочь?</item>
+        <item>Здравствуйте! Джарвис к вашим услугам.</item>
+        <item>Привет! Готов быть вашим верным помощником.</item>
+    </string-array>
+
+    <string-array name="how_are_you_responses">
+        <item>У меня всё отлично, спасибо! А у тебя?</item>
+        <item>Как у машины — безупречно! А ты как?</item>
+        <item>Я в порядке, господин. Как дела у вас?</item>
+    </string-array>
+
+    <string-array name="unknown_responses">
+        <item>Хм, не понял. Может, попробуем что-то вроде \'Привет\' или \'Включи Wi-Fi\'?</item>
+        <item>Команда не ясна, господин. Дайте подсказку!</item>
+        <item>Это слишком сложно даже для меня. Попробуй проще!</item>
+    </string-array>
+
+    <string-array name="wifi_on_responses">
+        <item>Wi-Fi включен, господин, сеть зовет!</item>
+        <item>Вай-фай активирован, теперь вы в онлайне!</item>
+        <item>Сеть готова, сэр, что дальше?</item>
+    </string-array>
+
+    <string-array name="wifi_off_responses">
+        <item>Wi-Fi выключен, возвращаемся в офлайн, господин.</item>
+        <item>Сеть отключена, наслаждайтесь тишиной!</item>
+        <item>Вай-фай спит, сэр, что еще сделать?</item>
+    </string-array>
+
+    <string-array name="sound_off_responses">
+        <item>Звук выключен, тишина воцарилась, господин.</item>
+        <item>Тишина активирована, сэр, наслаждайтесь покоем.</item>
+        <item>Звук спит, что дальше?</item>
+    </string-array>
+
+    <string-array name="sound_on_responses">
+        <item>Звук возвращен, господин, мир ожил!</item>
+        <item>Громкость включена, сэр, что послушаем?</item>
+        <item>Звук готов, наслаждайтесь!</item>
+    </string-array>
+</resources>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true"> <!-- Сообщения пользователя -->
+        <shape>
+            <solid android:color="@color/message_background_user" />
+            <corners android:radius="12dp" />
+            <stroke android:width="1dp" android:color="#40FFFFFF" />
+        </shape>
+    </item>
+    <item> <!-- Сообщения Jarvis -->
+        <shape>
+            <solid android:color="#30E0E0E0" />
+            <corners android:radius="12dp" />
+            <stroke android:width="1dp" android:color="#4000FF99" />
+        </shape>
+    </item>
+</selector>

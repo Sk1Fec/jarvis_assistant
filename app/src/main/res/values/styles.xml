@@ -1,0 +1,20 @@
+<resources>
+    <style name="Theme.JarvisAssistant" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/accent_neon</item>
+        <item name="colorPrimaryVariant">@color/accent_neon</item>
+        <item name="colorOnPrimary">@color/text_primary</item>
+        <item name="android:windowBackground">@color/background_primary</item>
+        <item name="android:statusBarColor">@color/background_primary</item>
+        <item name="android:navigationBarColor">@color/background_primary</item>
+    </style>
+
+    <!-- Добавлена светлая тема -->
+    <style name="Theme.JarvisAssistant.Light" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">@color/accent_neon</item>
+        <item name="colorPrimaryVariant">@color/accent_neon</item>
+        <item name="colorOnPrimary">@color/text_primary</item>
+        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="android:statusBarColor">#FFFFFF</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
+    </style>
+</resources>
