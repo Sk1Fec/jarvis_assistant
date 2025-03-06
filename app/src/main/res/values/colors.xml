@@ -4,8 +4,8 @@
     <color name="text_primary">#FFFFFF</color>
     <color name="text_hint">#B0B0B0</color>
     <color name="accent_neon">#00D4FF</color>
-    <color name="message_background_user">#D81B60</color>
-    <color name="message_background_jarvis">#0288D1</color>
+    <color name="message_background_user">#C2185B</color>
+    <color name="message_background_jarvis">#0277BD</color>
     <color name="input_background">#2A2A2A</color>
     <color name="divider_line">#424242</color>
     <color name="background_color">#1C242C</color>
