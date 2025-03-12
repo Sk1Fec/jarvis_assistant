@@ -69,5 +69,10 @@ dependencies {
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.preference.ktx)
     implementation("androidx.media3:media3-session:1.3.1") // Для улучшенной поддержки аудио
-    implementation("androidx.media:media:1.6.0") // Для TextToSpeech
+    implementation("androidx.media:media:1.6.0")
+    implementation(libs.androidx.core.animation) // Для TextToSpeech
+    testImplementation(libs.junit)
+    testImplementation(libs.mockito.core)
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:core:1.5.0")
 }

@@ -5,8 +5,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.media.AudioManager
-import android.net.wifi.WifiManager
 import android.os.Build
 import android.preference.PreferenceManager
 import android.util.Log
@@ -31,6 +29,7 @@ class CommandProcessor(private val context: Context) {
 
     private val prefs by lazy { PreferenceManager.getDefaultSharedPreferences(context) }
     private val isSarcasmEnabled: Boolean get() = prefs.getBoolean("sarcasm_enabled", false)
+    private val deviceControlManager = DeviceControlManager(context)
 
     @RequiresApi(Build.VERSION_CODES.M)
     fun process(input: String): String {
@@ -39,20 +38,29 @@ class CommandProcessor(private val context: Context) {
 
         val baseResponse = when {
             trimmedInput.startsWith("напомни мне через") -> setReminder(trimmedInput)
+            trimmedInput.matches(Regex("сколько (\\d+)% от (\\d+)")) -> calculatePercentage(trimmedInput)
             trimmedInput in listOf("привет", "здравствуй") -> greetingResponses.random()
             trimmedInput == "как дела" -> howAreYouResponses.random()
             trimmedInput == "покажи время" -> {
                 val currentTime = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()).format(Date())
                 "Текущее время: $currentTime, господин."
             }
-            trimmedInput in listOf("включи вайфай", "включи wi-fi") -> toggleWifi(true)
-            trimmedInput in listOf("выключи вайфай", "выключи wi-fi") -> toggleWifi(false)
-            trimmedInput == "выключи звук" -> setMute(true)
-            trimmedInput == "включи звук" -> setMute(false)
+            trimmedInput in listOf("включи вайфай", "включи wi-fi") -> deviceControlManager.toggleWifi(true, wifiOnResponses, wifiOffResponses)
+            trimmedInput in listOf("выключи вайфай", "выключи wi-fi") -> deviceControlManager.toggleWifi(false, wifiOnResponses, wifiOffResponses)
+            trimmedInput == "выключи звук" -> deviceControlManager.setMute(true, soundOffResponses, soundOnResponses)
+            trimmedInput == "включи звук" -> deviceControlManager.setMute(false, soundOffResponses, soundOnResponses)
             else -> unknownResponses.random()
         }
 
         return if (isSarcasmEnabled) "$baseResponse ${JarvisPersonality.getWittyResponse()}" else baseResponse
+    }
+
+    private fun calculatePercentage(input: String): String {
+        val match = Regex("сколько (\\d+)% от (\\d+)").find(input)!!
+        val percent = match.groupValues[1].toInt()
+        val number = match.groupValues[2].toInt()
+        val result = (percent * number) / 100
+        return "$result, я гений, да?"
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
@@ -104,78 +112,7 @@ class CommandProcessor(private val context: Context) {
             return "Напоминание на '$text' через $timeValue $timeUnit установлено."
         } catch (e: SecurityException) {
             Log.e(TAG, "Failed to set reminder: ${e.message}")
-            return "Не могу установить напоминание, проверь разрешения!"
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun toggleWifi(enable: Boolean): String {
-        val wifiManager = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        if (!PermissionManager.checkPermission(context, Manifest.permission.CHANGE_WIFI_STATE) ||
-            !PermissionManager.checkPermission(context, Manifest.permission.ACCESS_WIFI_STATE)) {
-            Log.w(TAG, "Wi-Fi permissions missing: CHANGE_WIFI_STATE=${PermissionManager.checkPermission(context, Manifest.permission.CHANGE_WIFI_STATE)}, ACCESS_WIFI_STATE=${PermissionManager.checkPermission(context, Manifest.permission.ACCESS_WIFI_STATE)}")
-            PermissionManager.requestPermissions(context as AppCompatActivity) { _ -> }
-            return "Дай разрешения на управление и доступ к Wi-Fi, господин!"
-        }
-
-        try {
-            val currentState = wifiManager.isWifiEnabled
-            Log.d(TAG, "Current Wi-Fi state: $currentState")
-            if (currentState != enable) {
-                wifiManager.isWifiEnabled = enable
-                Thread.sleep(1000) // Ждём обновления состояния
-                val newState = wifiManager.isWifiEnabled
-                Log.d(TAG, "New Wi-Fi state: $newState")
-                if (newState == enable) {
-                    return if (enable) wifiOnResponses.random() else wifiOffResponses.random()
-                } else {
-                    return "Не удалось ${if (enable) "включить" else "выключить"} Wi-Fi, господин!"
-                }
-            } else {
-                return if (enable) "Wi-Fi уже включён, господин!" else "Wi-Fi уже выключен, господин!"
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to toggle Wi-Fi: ${e.message}")
-            return "Wi-Fi не подчиняется, господин! Возможно, системное ограничение."
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun setMute(mute: Boolean): String {
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        if (!PermissionManager.checkPermission(context, Manifest.permission.MODIFY_AUDIO_SETTINGS)) {
-            Log.w(TAG, "Audio permission missing")
-            PermissionManager.requestPermissions(context as AppCompatActivity) { _ -> }
-            return "Дай разрешение на управление звуком, господин!"
-        }
-
-        try {
-            val currentMode = audioManager.ringerMode
-            Log.d(TAG, "Current ringer mode: $currentMode")
-            if (mute && currentMode != AudioManager.RINGER_MODE_VIBRATE) {
-                audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
-                Log.d(TAG, "Switched to vibrate mode")
-                return soundOffResponses.random()
-            } else if (!mute && currentMode != AudioManager.RINGER_MODE_NORMAL) {
-                audioManager.ringerMode = AudioManager.RINGER_MODE_NORMAL
-                audioManager.setStreamVolume(
-                    AudioManager.STREAM_RING,
-                    audioManager.getStreamMaxVolume(AudioManager.STREAM_RING) / 2,
-                    0
-                )
-                audioManager.setStreamVolume(
-                    AudioManager.STREAM_NOTIFICATION,
-                    audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION) / 2,
-                    0
-                )
-                Log.d(TAG, "Switched to normal mode")
-                return soundOnResponses.random()
-            } else {
-                return if (mute) "Уже в режиме вибрации, господин!" else "Звук уже включён, господин!"
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to toggle sound: ${e.message}")
-            return "Звук не хочет слушаться, господин! Проверь настройки."
+            return "Нет прав на установку напоминания, проверь разрешения!"
         }
     }
 }

@@ -15,11 +15,13 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import android.preference.PreferenceManager
+import kotlin.math.max
 
 class ChatViewModel(
     private val context: Context,
@@ -36,7 +38,6 @@ class ChatViewModel(
     private val scope = CoroutineScope(Dispatchers.Main)
     private val commandProcessor = CommandProcessor(context)
 
-    // Проверяем настройки голосового вывода
     private val isVoiceEnabled: Boolean
         get() = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("voice_enabled", false)
 
@@ -49,10 +50,12 @@ class ChatViewModel(
         _messages.postValue(currentMessages)
 
         _isTyping.postValue(true)
-        Log.d("ChatViewModel", "Processing input: '$text', simulateTyping: true")
+        Log.d("ChatViewModel", "User message added: '$text', isTyping: true")
 
         scope.launch(Dispatchers.IO) {
             val response = commandProcessor.process(text)
+            val delayTime = maxOf(500L, response.length * 10L) // 10 мс на символ, минимум 500 мс
+            delay(delayTime)
             launch(Dispatchers.Main) {
                 _isTyping.postValue(false)
                 Log.d("ChatViewModel", "Response from Jarvis: '$response'")
@@ -62,7 +65,6 @@ class ChatViewModel(
                 _messages.postValue(updatedMessages)
                 saveMessages(updatedMessages)
 
-                // Озвучиваем ответ Джарвиса, если голос включён
                 if (isVoiceEnabled) {
                     textToSpeech.speak(response, TextToSpeech.QUEUE_FLUSH, null, null)
                 }
@@ -95,12 +97,11 @@ class ChatViewModel(
     }
 
     fun getFormattedTimestamp(timestamp: Long): String {
-        val sdf = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()) // Добавлена дата для старых сообщений
+        val sdf = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault())
         return sdf.format(Date(timestamp))
     }
 }
 
-// Фабрика для создания ChatViewModel с Context, SharedPreferences и TextToSpeech
 class ChatViewModelFactory(
     private val context: Context,
     private val prefs: SharedPreferences,

@@ -6,19 +6,23 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.snackbar.Snackbar
 
 object PermissionManager {
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private val REQUIRED_PERMISSIONS = arrayOf(
         Manifest.permission.INTERNET,
         Manifest.permission.CHANGE_WIFI_STATE,
         Manifest.permission.MODIFY_AUDIO_SETTINGS,
-        Manifest.permission.POST_NOTIFICATIONS // Для Android 13+
+        Manifest.permission.POST_NOTIFICATIONS, // Для Android 13+
+        Manifest.permission.RECORD_AUDIO // Добавляем разрешение на микрофон
     )
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     fun requestPermissions(activity: AppCompatActivity, onResult: (Boolean) -> Unit) {
         val permissionsToRequest = REQUIRED_PERMISSIONS.filter {
             ContextCompat.checkSelfPermission(activity, it) != android.content.pm.PackageManager.PERMISSION_GRANTED

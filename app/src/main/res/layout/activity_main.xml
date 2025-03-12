@@ -5,6 +5,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/gradient_background"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     tools:context=".ui.activity.MainActivity">
 
     <ImageButton
@@ -49,10 +51,10 @@
         android:layout_height="0dp"
         android:layout_marginBottom="8dp"
         android:overScrollMode="never"
-    app:layout_constraintBottom_toTopOf="@+id/inputContainer"
-    app:layout_constraintEnd_toEndOf="parent"
-    app:layout_constraintStart_toStartOf="parent"
-    app:layout_constraintTop_toBottomOf="@id/dividerLine" />
+        app:layout_constraintBottom_toTopOf="@+id/inputContainer"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/dividerLine" />
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/inputContainer"
@@ -62,7 +64,9 @@
         android:background="@drawable/input_background"
         android:backgroundTint="#2A2A2A"
         android:elevation="6dp"
-        android:padding="8dp"
+        android:padding="12dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -70,7 +74,9 @@
         <EditText
             android:id="@+id/messageInput"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="wrap_content"
+            android:maxHeight="100dp"
+            android:scrollbars="vertical"
             android:background="@null"
             android:hint="Команда для Jarvis"
             android:textColor="@color/text_primary"
@@ -81,16 +87,28 @@
             android:imeOptions="actionSend"
             android:inputType="text"
             android:maxLines="3"
-        android:adjustViewBounds="true"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toStartOf="@+id/sendButton"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/micButton"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageButton
+            android:id="@+id/micButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/send_button_background"
+            android:contentDescription="Голосовой ввод"
+            android:src="@drawable/ic_mic"
+            android:tint="@color/accent_neon"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/sendButton"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <ImageButton
             android:id="@+id/sendButton"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="@drawable/send_button_background"
             android:contentDescription="Отправить"
             android:src="@drawable/ic_send"

@@ -14,10 +14,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.jarvisassistant.R
 import com.example.jarvisassistant.data.Message
 import com.example.jarvisassistant.viewmodel.ChatViewModel
-import android.util.Log
-import com.google.android.material.shape.CornerFamily
-import com.google.android.material.shape.MaterialShapeDrawable
-import com.google.android.material.shape.ShapeAppearanceModel
 
 class ChatAdapter(
     private val viewModel: ChatViewModel,
@@ -46,13 +42,16 @@ class ChatAdapter(
 
         fun startAnimation() {
             lines.forEachIndexed { index, line ->
-                line.setBackgroundColor(ContextCompat.getColor(line.context, R.color.accent_neon))
-                ValueAnimator.ofFloat(0.4f, 1f).apply {
-                    duration = 600
+                ValueAnimator.ofFloat(0f, 1f).apply {
+                    duration = 800
                     repeatMode = ValueAnimator.REVERSE
                     repeatCount = ValueAnimator.INFINITE
                     startDelay = (index * 200).toLong()
-                    addUpdateListener { line.alpha = it.animatedValue as Float }
+                    addUpdateListener { animation ->
+                        val value = animation.animatedValue as Float
+                        line.scaleX = 0.8f + value * 0.4f
+                        line.alpha = 0.5f + value * 0.5f
+                    }
                     start()
                 }
             }
@@ -83,49 +82,38 @@ class ChatAdapter(
                 holder.timestampText.text = message.getFormattedTimestamp()
                 holder.messageText.setTextColor(ContextCompat.getColor(holder.itemView.context, android.R.color.white))
 
-                val shapeAppearanceModel = ShapeAppearanceModel.builder().apply {
-                    if (message.isSentByUser) {
-                        setTopLeftCorner(CornerFamily.ROUNDED, 16f)
-                        setTopRightCorner(CornerFamily.ROUNDED, 16f)
-                        setBottomLeftCorner(CornerFamily.ROUNDED, 16f)
-                        setBottomRightCorner(CornerFamily.ROUNDED, 4f)
-                    } else {
-                        setTopLeftCorner(CornerFamily.ROUNDED, 16f)
-                        setTopRightCorner(CornerFamily.ROUNDED, 16f)
-                        setBottomLeftCorner(CornerFamily.ROUNDED, 4f)
-                        setBottomRightCorner(CornerFamily.ROUNDED, 16f)
-                    }
-                }.build()
-
-                val background = MaterialShapeDrawable(shapeAppearanceModel).apply {
-                    fillColor = ContextCompat.getColorStateList(
-                        holder.itemView.context,
-                        if (message.isSentByUser) R.color.message_background_user
-                        else R.color.message_background_jarvis
-                    )
-                }
-                holder.messageCard.background = background
+                holder.messageCard.background = ContextCompat.getDrawable(
+                    holder.itemView.context,
+                    if (message.isSentByUser) R.drawable.bg_message_user else R.drawable.bg_message_jarvis
+                )
                 holder.messageCard.cardElevation = 2f
 
-                val params = holder.messageCard.layoutParams as ConstraintLayout.LayoutParams
-                params.width = 0 // Используем ограничение из XML (70%)
-                params.height = ConstraintLayout.LayoutParams.WRAP_CONTENT
-                if (message.isSentByUser) {
-                    params.startToStart = ConstraintLayout.LayoutParams.UNSET
-                    params.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
-                    params.horizontalBias = 1.0f // Прижимаем вправо
-                    holder.messageText.setPadding(0, 0, 12, 0) // Отступ справа для текста
-                    holder.messageText.textAlignment = View.TEXT_ALIGNMENT_TEXT_END // Текст прижат вправо
-                } else {
-                    params.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
-                    params.endToEnd = ConstraintLayout.LayoutParams.UNSET
-                    params.horizontalBias = 0.0f // Прижимаем влево
-                    holder.messageText.setPadding(12, 0, 0, 0) // Отступ слева для текста
-                    holder.messageText.textAlignment = View.TEXT_ALIGNMENT_TEXT_START // Текст прижат влево
-                }
-                holder.messageCard.layoutParams = params
+                val cardParams = holder.messageCard.layoutParams as ConstraintLayout.LayoutParams
+                cardParams.width = 0
+                cardParams.height = ConstraintLayout.LayoutParams.WRAP_CONTENT
 
-                if (position == messages.size - 1 && !holder.isAnimated) {
+                val timestampParams = holder.timestampText.layoutParams as ConstraintLayout.LayoutParams
+                if (message.isSentByUser) {
+                    cardParams.startToStart = ConstraintLayout.LayoutParams.UNSET
+                    cardParams.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
+                    cardParams.horizontalBias = 1.0f
+                    holder.messageText.setPadding(8, 8, 12, 8)
+                    timestampParams.startToStart = ConstraintLayout.LayoutParams.UNSET
+                    timestampParams.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
+                    timestampParams.horizontalBias = 1.0f
+                } else {
+                    cardParams.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
+                    cardParams.endToEnd = ConstraintLayout.LayoutParams.UNSET
+                    cardParams.horizontalBias = 0.0f
+                    holder.messageText.setPadding(12, 8, 8, 8)
+                    timestampParams.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
+                    timestampParams.endToEnd = ConstraintLayout.LayoutParams.UNSET
+                    timestampParams.horizontalBias = 0.0f
+                }
+                holder.messageCard.layoutParams = cardParams
+                holder.timestampText.layoutParams = timestampParams
+
+                if (position == messages.size - 1 && !holder.isAnimated && holder.itemView.isShown) {
                     holder.messageCard.alpha = 0f
                     holder.messageCard.translationY = 10f
                     holder.messageCard.animate()
@@ -133,10 +121,7 @@ class ChatAdapter(
                         .translationY(0f)
                         .setDuration(200)
                         .setInterpolator(AccelerateDecelerateInterpolator())
-                        .withEndAction {
-                            holder.isAnimated = true
-                            if (!message.isSentByUser) animateTextTyping(holder.messageText, message.text)
-                        }
+                        .withEndAction { holder.isAnimated = true }
                         .start()
                 } else {
                     holder.messageCard.alpha = 1f
@@ -147,38 +132,31 @@ class ChatAdapter(
         }
     }
 
-    private fun animateTextTyping(textView: TextView, fullText: String) {
-        textView.text = ""
-        var currentIndex = 0
-        ValueAnimator.ofFloat(0f, fullText.length.toFloat()).apply {
-            duration = (fullText.length * 15).toLong()
-            addUpdateListener { animation ->
-                val end = (animation.animatedValue as Float).toInt()
-                if (end > currentIndex) {
-                    textView.text = fullText.substring(0, end)
-                    currentIndex = end
-                }
-            }
-            start()
-        }
-    }
-
     override fun getItemCount(): Int = (viewModel.messages.value?.size ?: 0) + if (viewModel.isTyping.value == true) 1 else 0
 
     override fun getItemViewType(position: Int): Int {
         val messages = viewModel.messages.value ?: emptyList()
-        return if (position == messages.size && viewModel.isTyping.value == true) VIEW_TYPE_TYPING else VIEW_TYPE_MESSAGE
+        return if (position >= messages.size && viewModel.isTyping.value == true) VIEW_TYPE_TYPING else VIEW_TYPE_MESSAGE
     }
 
     fun updateMessages(newMessages: List<Message>) {
         val oldMessages = viewModel.messages.value ?: emptyList()
-        val diffResult = DiffUtil.calculateDiff(MessageDiffCallback(oldMessages, newMessages), true)
-        diffResult.dispatchUpdatesTo(this)
+        if (oldMessages.size == newMessages.size - 1 && oldMessages == newMessages.dropLast(1)) {
+            notifyItemInserted(newMessages.size - 1)
+        } else {
+            val diffResult = DiffUtil.calculateDiff(MessageDiffCallback(oldMessages, newMessages), true)
+            diffResult.dispatchUpdatesTo(this)
+        }
     }
 
     fun onTypingChanged(isTyping: Boolean) {
         val currentMessagesSize = (viewModel.messages.value ?: emptyList()).size
-        if (isTyping) notifyItemInserted(currentMessagesSize) else notifyItemRemoved(currentMessagesSize)
+        if (isTyping) {
+            notifyItemInserted(currentMessagesSize)
+            recyclerView.post { recyclerView.smoothScrollToPosition(currentMessagesSize) }
+        } else {
+            notifyItemRemoved(currentMessagesSize)
+        }
     }
 
     private class MessageDiffCallback(

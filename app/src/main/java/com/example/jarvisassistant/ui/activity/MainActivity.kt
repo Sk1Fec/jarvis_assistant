@@ -3,12 +3,17 @@ package com.example.jarvisassistant.ui.activity
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.Manifest
 import android.content.SharedPreferences
 import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.view.Menu
 import android.view.MenuItem
 import android.view.animation.OvershootInterpolator
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -19,18 +24,29 @@ import com.example.jarvisassistant.R
 import com.example.jarvisassistant.viewmodel.ChatViewModelFactory
 import com.google.android.material.snackbar.Snackbar
 import android.view.inputmethod.InputMethodManager
-import android.widget.Toast
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.os.Build
+import androidx.annotation.RequiresApi
 import java.util.Locale
+import android.animation.ValueAnimator
+import android.view.View
 
 class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var chatAdapter: ChatAdapter
     private lateinit var textToSpeech: TextToSpeech
+    private lateinit var speechRecognizer: SpeechRecognizer
+    private lateinit var recognizerIntent: Intent
     private val viewModel: ChatViewModel by viewModels {
         ChatViewModelFactory(this, getSharedPreferences("JarvisChat", MODE_PRIVATE), textToSpeech)
     }
 
+    private var micPulseAnimator: ValueAnimator? = null
+    private var isMicActive = false // Флаг для отслеживания состояния микрофона
+
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -38,6 +54,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         textToSpeech = TextToSpeech(this, this)
         chatAdapter = ChatAdapter(viewModel, binding.chatRecyclerView)
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+        recognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
 
         setupRecyclerView()
         setupPermissions()
@@ -52,7 +74,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 Toast.makeText(this, "Русский язык не поддерживается для голоса.", Toast.LENGTH_LONG).show()
             }
         } else {
-            Toast.makeText(this, "Голос не инициализирован, господин!", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Ошибка инициализации голоса. Повторяю...", Toast.LENGTH_LONG).show()
+            textToSpeech = TextToSpeech(this, this)
         }
     }
 
@@ -79,6 +102,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun setupPermissions() {
         PermissionManager.requestPermissions(this) { allGranted ->
             if (!allGranted) {
@@ -97,6 +121,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     @SuppressLint("NotifyDataSetChanged")
     private fun setupListeners() {
         binding.sendButton.setOnClickListener {
@@ -124,6 +149,91 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 }
                 .start()
         }
+        binding.micButton.setOnClickListener {
+            if (PermissionManager.checkPermission(this, Manifest.permission.RECORD_AUDIO)) {
+                toggleSpeechRecognition()
+            } else {
+                PermissionManager.requestPermissions(this) { granted ->
+                    if (granted) toggleSpeechRecognition()
+                    else Toast.makeText(this, "Разрешение на микрофон нужно, господин!", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        speechRecognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                binding.messageInput.hint = "Говорите, господин..."
+                startMicAnimation()
+            }
+            override fun onBeginningOfSpeech() {
+                binding.messageInput.hint = "Слушаю..."
+            }
+            override fun onRmsChanged(rmsdB: Float) {
+                val scale = 1f + (rmsdB / 20f).coerceIn(0f, 0.5f)
+                binding.micButton.scaleX = scale
+                binding.micButton.scaleY = scale
+            }
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {
+                binding.messageInput.hint = "Команда для Jarvis"
+                stopMicAnimation()
+                isMicActive = false // Сбрасываем флаг
+            }
+            override fun onError(error: Int) {
+                stopMicAnimation()
+                Toast.makeText(this@MainActivity, "Ошибка распознавания: $error", Toast.LENGTH_SHORT).show()
+                isMicActive = false // Сбрасываем флаг при ошибке
+            }
+            override fun onResults(results: Bundle?) {
+                stopMicAnimation()
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!matches.isNullOrEmpty()) {
+                    val recognizedText = matches[0]
+                    binding.messageInput.setText(recognizedText)
+                    sendMessage()
+                }
+                isMicActive = false // Сбрасываем флаг после результата
+            }
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+    }
+
+    private fun toggleSpeechRecognition() {
+        if (isMicActive) {
+            speechRecognizer.stopListening() // Останавливаем распознавание
+            stopMicAnimation()
+            binding.messageInput.hint = "Команда для Jarvis"
+            Toast.makeText(this, "Микрофон выключен, господин!", Toast.LENGTH_SHORT).show()
+            isMicActive = false
+        } else {
+            speechRecognizer.startListening(recognizerIntent)
+            Toast.makeText(this, "Говорите, господин!", Toast.LENGTH_SHORT).show()
+            isMicActive = true
+        }
+    }
+
+    private fun startMicAnimation() {
+        micPulseAnimator?.cancel()
+        micPulseAnimator = ValueAnimator.ofFloat(1f, 1.15f).apply {
+            duration = 500
+            repeatMode = ValueAnimator.REVERSE
+            repeatCount = ValueAnimator.INFINITE
+            addUpdateListener { animation ->
+                val value = animation.animatedValue as Float
+                binding.micButton.scaleX = value
+                binding.micButton.scaleY = value
+            }
+            start()
+        }
+        binding.micButton.setBackgroundResource(R.drawable.mic_active_background)
+    }
+
+    private fun stopMicAnimation() {
+        micPulseAnimator?.cancel()
+        binding.micButton.scaleX = 1f
+        binding.micButton.scaleY = 1f
+        binding.micButton.setBackgroundResource(R.drawable.send_button_background)
     }
 
     private fun setupAnimations() {
@@ -132,24 +242,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.inputContainer.animate()
             .translationY(0f)
             .alpha(1f)
-            .setDuration(600) // Уменьшил для скорости
-            .setInterpolator(OvershootInterpolator(1.5f)) // Мягче подпрыгивание
+            .setDuration(600)
+            .setInterpolator(OvershootInterpolator(1.5f))
             .start()
     }
 
     private fun animateSendButton() {
-        binding.sendButton.animate()
-            .scaleX(1.1f)
-            .scaleY(1.1f)
-            .setDuration(100)
-            .withEndAction {
-                binding.sendButton.animate()
-                    .scaleX(1f)
-                    .scaleY(1f)
-                    .setDuration(100)
-                    .start()
-            }
-            .start()
+        AnimatorSet().apply {
+            playTogether(
+                ObjectAnimator.ofFloat(binding.sendButton, "scaleX", 1f, 1.1f, 1f),
+                ObjectAnimator.ofFloat(binding.sendButton, "scaleY", 1f, 1.1f, 1f)
+            )
+            duration = 200
+            interpolator = OvershootInterpolator(0.5f)
+            start()
+        }
     }
 
     private fun sendMessage() {
@@ -189,5 +296,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         super.onDestroy()
         textToSpeech.stop()
         textToSpeech.shutdown()
+        speechRecognizer.destroy()
+        micPulseAnimator?.cancel()
+        if (isMicActive) speechRecognizer.stopListening() // Останавливаем при уничтожении активности
     }
 }
