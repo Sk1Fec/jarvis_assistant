@@ -12,31 +12,27 @@ import com.google.android.material.snackbar.Snackbar
 
 object PermissionManager {
 
-    private const val REQUEST_PERMISSIONS = 100
-    private const val REQUEST_ALARM_PERMISSION = 101
+    private val REQUIRED_PERMISSIONS = arrayOf(
+        Manifest.permission.INTERNET,
+        Manifest.permission.CHANGE_WIFI_STATE,
+        Manifest.permission.MODIFY_AUDIO_SETTINGS,
+        Manifest.permission.POST_NOTIFICATIONS // Для Android 13+
+    )
 
     fun requestPermissions(activity: AppCompatActivity, onResult: (Boolean) -> Unit) {
-        var permissions = arrayOf(
-            Manifest.permission.INTERNET,
-            Manifest.permission.CHANGE_WIFI_STATE,
-            Manifest.permission.MODIFY_AUDIO_SETTINGS
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions += Manifest.permission.POST_NOTIFICATIONS
-        }
-
-        val permissionsToRequest = permissions.filter {
+        val permissionsToRequest = REQUIRED_PERMISSIONS.filter {
             ContextCompat.checkSelfPermission(activity, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
         }.toTypedArray()
 
         if (permissionsToRequest.isNotEmpty()) {
-            activity.registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+            val launcher = activity.registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
                 val allGranted = results.all { it.value }
                 onResult(allGranted)
                 if (!allGranted) {
-                    showAppSettings(activity, "Некоторые разрешения не предоставлены. Включи их в настройках.")
+                    showAppSettings(activity, "Господин, дайте мне разрешения, иначе я бесполезен!")
                 }
-            }.launch(permissionsToRequest)
+            }
+            launcher.launch(permissionsToRequest)
         } else {
             onResult(true)
         }

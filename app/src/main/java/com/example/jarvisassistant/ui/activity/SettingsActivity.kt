@@ -1,9 +1,9 @@
 package com.example.jarvisassistant.ui.activity
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.jarvisassistant.databinding.ActivitySettingsBinding
-import com.example.jarvisassistant.R
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
 
@@ -28,16 +28,23 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
+        binding.backButton.setOnClickListener { finish() }
         binding.permissionsButton.setOnClickListener {
-            PermissionManager.showAppSettings(this, "Перейдите в настройки для предоставления всех разрешений.")
+            PermissionManager.showAppSettings(this, "Перейдите в настройки, господин!")
         }
         binding.sarcasmSwitch.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("sarcasm_enabled", isChecked).apply()
-            // TODO: Реализовать логику сарказма в CommandProcessor
+            val wasChecked = prefs.getBoolean("sarcasm_enabled", false)
+            if (wasChecked != isChecked) { // Тост только при изменении
+                prefs.edit().putBoolean("sarcasm_enabled", isChecked).apply()
+                Toast.makeText(this, if (isChecked) "Сарказм активирован!" else "Сарказм отключён!", Toast.LENGTH_SHORT).show()
+            }
         }
         binding.voiceSwitch.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("voice_enabled", isChecked).apply()
-            // TODO: Реализовать голосовые ответы через TextToSpeech
+            val wasChecked = prefs.getBoolean("voice_enabled", false)
+            if (wasChecked != isChecked) { // Тост только при изменении
+                prefs.edit().putBoolean("voice_enabled", isChecked).apply()
+                Toast.makeText(this, if (isChecked) "Голос включён!" else "Голос выключен!", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

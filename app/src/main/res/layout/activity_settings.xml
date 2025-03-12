@@ -64,18 +64,9 @@
                 android:text="Настройки разрешений"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp" />
-
-            <!-- Добавлен ProgressBar для длительных операций -->
-            <ProgressBar
-                android:id="@+id/loadingIndicator"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:visibility="gone"
-                android:layout_gravity="center" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- Добавлена кнопка "Назад" для навигации -->
     <ImageButton
         android:id="@+id/backButton"
         android:layout_width="56dp"

@@ -28,13 +28,6 @@ class AlarmReceiver : BroadcastReceiver() {
         val channelId = "jarvis_reminder_channel"
         val notificationId = System.currentTimeMillis().toInt()
 
-        val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Напоминание от Jarvis")
-            .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setAutoCancel(true)
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channelName = "Jarvis Reminders"
             val importance = android.app.NotificationManager.IMPORTANCE_DEFAULT
@@ -44,6 +37,13 @@ class AlarmReceiver : BroadcastReceiver() {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
+
+        val builder = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Напоминание от Jarvis")
+            .setContentText(message)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
 
         with(NotificationManagerCompat.from(context)) {
             try {

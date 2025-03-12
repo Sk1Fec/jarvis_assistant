@@ -57,17 +57,17 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.material)
+    implementation(libs.material) // Material Design 3
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.recyclerview)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.cardview)
-    implementation(libs.androidx.recyclerview.v132)
     implementation(libs.androidx.lifecycle.livedata.ktx)
-    implementation(libs.kotlinx.coroutines.android.v173)
     implementation(libs.gson)
     implementation(libs.androidx.activity.ktx)
-    implementation(libs.androidx.preference.ktx) // Для ActivityResultContracts
+    implementation(libs.androidx.preference.ktx)
+    implementation("androidx.media3:media3-session:1.3.1") // Для улучшенной поддержки аудио
+    implementation("androidx.media:media:1.6.0") // Для TextToSpeech
 }

@@ -47,11 +47,11 @@ class ChatAdapter(
         fun startAnimation() {
             lines.forEachIndexed { index, line ->
                 line.setBackgroundColor(ContextCompat.getColor(line.context, R.color.accent_neon))
-                ValueAnimator.ofFloat(0.2f, 1f).apply {
-                    duration = 400
+                ValueAnimator.ofFloat(0.4f, 1f).apply {
+                    duration = 600
                     repeatMode = ValueAnimator.REVERSE
                     repeatCount = ValueAnimator.INFINITE
-                    startDelay = (index * 150).toLong()
+                    startDelay = (index * 200).toLong()
                     addUpdateListener { line.alpha = it.animatedValue as Float }
                     start()
                 }
@@ -79,18 +79,10 @@ class ChatAdapter(
                 if (position >= messages.size) return
 
                 val message = messages[position]
-                Log.d(TAG, "Binding message at pos=$position: text='${message.text}', isUser=${message.isSentByUser}")
-
                 holder.messageText.text = message.text
                 holder.timestampText.text = message.getFormattedTimestamp()
                 holder.messageText.setTextColor(ContextCompat.getColor(holder.itemView.context, android.R.color.white))
 
-                // Настройка карточки сообщения
-                val context = holder.itemView.context
-                val screenWidth = context.resources.displayMetrics.widthPixels
-                val maxWidthPx = (screenWidth * 0.60f).toInt() // Ограничение 60% экрана
-
-                // Динамические углы для "пузырьков"
                 val shapeAppearanceModel = ShapeAppearanceModel.builder().apply {
                     if (message.isSentByUser) {
                         setTopLeftCorner(CornerFamily.ROUNDED, 16f)
@@ -107,7 +99,7 @@ class ChatAdapter(
 
                 val background = MaterialShapeDrawable(shapeAppearanceModel).apply {
                     fillColor = ContextCompat.getColorStateList(
-                        context,
+                        holder.itemView.context,
                         if (message.isSentByUser) R.color.message_background_user
                         else R.color.message_background_jarvis
                     )
@@ -115,36 +107,35 @@ class ChatAdapter(
                 holder.messageCard.background = background
                 holder.messageCard.cardElevation = 2f
 
-                // Выравнивание и отступы
                 val params = holder.messageCard.layoutParams as ConstraintLayout.LayoutParams
-                params.width = ConstraintLayout.LayoutParams.WRAP_CONTENT
+                params.width = 0 // Используем ограничение из XML (70%)
                 params.height = ConstraintLayout.LayoutParams.WRAP_CONTENT
-                params.topMargin = 16 // Увеличен до 16dp
-                params.bottomMargin = 16 // Увеличен до 16dp
-                params.startToStart = if (message.isSentByUser) ConstraintLayout.LayoutParams.UNSET else ConstraintLayout.LayoutParams.PARENT_ID
-                params.endToEnd = if (message.isSentByUser) ConstraintLayout.LayoutParams.PARENT_ID else ConstraintLayout.LayoutParams.UNSET
-                params.leftMargin = 48 // Увеличен до 48dp
-                params.rightMargin = 48 // Увеличен до 48dp
-                params.width = params.width.coerceAtMost(maxWidthPx) // Ограничение ширины
+                if (message.isSentByUser) {
+                    params.startToStart = ConstraintLayout.LayoutParams.UNSET
+                    params.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
+                    params.horizontalBias = 1.0f // Прижимаем вправо
+                    holder.messageText.setPadding(0, 0, 12, 0) // Отступ справа для текста
+                    holder.messageText.textAlignment = View.TEXT_ALIGNMENT_TEXT_END // Текст прижат вправо
+                } else {
+                    params.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
+                    params.endToEnd = ConstraintLayout.LayoutParams.UNSET
+                    params.horizontalBias = 0.0f // Прижимаем влево
+                    holder.messageText.setPadding(12, 0, 0, 0) // Отступ слева для текста
+                    holder.messageText.textAlignment = View.TEXT_ALIGNMENT_TEXT_START // Текст прижат влево
+                }
                 holder.messageCard.layoutParams = params
-                Log.d(TAG, "Applied params: width=${params.width}, leftMargin=${params.leftMargin}, rightMargin=${params.rightMargin}")
 
-                // Анимация для нового сообщения
                 if (position == messages.size - 1 && !holder.isAnimated) {
-                    Log.d(TAG, "Animating new message at pos=$position")
                     holder.messageCard.alpha = 0f
-                    holder.messageCard.translationY = 20f
+                    holder.messageCard.translationY = 10f
                     holder.messageCard.animate()
                         .alpha(1f)
                         .translationY(0f)
                         .setDuration(200)
                         .setInterpolator(AccelerateDecelerateInterpolator())
-                        .withStartAction {
-                            if (!message.isSentByUser) holder.messageText.text = ""
-                        }
                         .withEndAction {
-                            if (!message.isSentByUser) animateTextTyping(holder.messageText, message.text)
                             holder.isAnimated = true
+                            if (!message.isSentByUser) animateTextTyping(holder.messageText, message.text)
                         }
                         .start()
                 } else {
@@ -152,20 +143,17 @@ class ChatAdapter(
                     holder.messageCard.translationY = 0f
                 }
             }
-            is TypingViewHolder -> {
-                Log.d(TAG, "Binding typing indicator at pos=$position")
-            }
+            is TypingViewHolder -> {}
         }
     }
 
     private fun animateTextTyping(textView: TextView, fullText: String) {
-        Log.d(TAG, "Typing animation for text: '$fullText'")
         textView.text = ""
         var currentIndex = 0
-        ValueAnimator.ofInt(0, fullText.length).apply {
-            duration = (fullText.length * 20).toLong()
+        ValueAnimator.ofFloat(0f, fullText.length.toFloat()).apply {
+            duration = (fullText.length * 15).toLong()
             addUpdateListener { animation ->
-                val end = animation.animatedValue as Int
+                val end = (animation.animatedValue as Float).toInt()
                 if (end > currentIndex) {
                     textView.text = fullText.substring(0, end)
                     currentIndex = end
@@ -175,12 +163,7 @@ class ChatAdapter(
         }
     }
 
-    override fun getItemCount(): Int {
-        val messages = viewModel.messages.value ?: emptyList()
-        val count = messages.size + if (viewModel.isTyping.value == true) 1 else 0
-        Log.d(TAG, "Item count: $count (messages=${messages.size}, isTyping=${viewModel.isTyping.value})")
-        return count
-    }
+    override fun getItemCount(): Int = (viewModel.messages.value?.size ?: 0) + if (viewModel.isTyping.value == true) 1 else 0
 
     override fun getItemViewType(position: Int): Int {
         val messages = viewModel.messages.value ?: emptyList()
@@ -191,17 +174,11 @@ class ChatAdapter(
         val oldMessages = viewModel.messages.value ?: emptyList()
         val diffResult = DiffUtil.calculateDiff(MessageDiffCallback(oldMessages, newMessages), true)
         diffResult.dispatchUpdatesTo(this)
-        Log.d(TAG, "Messages updated, new size: ${newMessages.size}")
     }
 
     fun onTypingChanged(isTyping: Boolean) {
         val currentMessagesSize = (viewModel.messages.value ?: emptyList()).size
-        Log.d(TAG, "Typing changed: $isTyping, position=$currentMessagesSize")
-        if (isTyping) {
-            notifyItemInserted(currentMessagesSize)
-        } else {
-            notifyItemRemoved(currentMessagesSize)
-        }
+        if (isTyping) notifyItemInserted(currentMessagesSize) else notifyItemRemoved(currentMessagesSize)
     }
 
     private class MessageDiffCallback(

@@ -2,6 +2,7 @@ package com.example.jarvisassistant.viewmodel
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -18,8 +19,13 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.preference.PreferenceManager
 
-class ChatViewModel(private val context: Context, private val prefs: SharedPreferences) : ViewModel() {
+class ChatViewModel(
+    private val context: Context,
+    private val prefs: SharedPreferences,
+    private val textToSpeech: TextToSpeech
+) : ViewModel() {
 
     private val _messages = MutableLiveData<MutableList<Message>>(loadMessages())
     val messages: LiveData<MutableList<Message>> get() = _messages
@@ -29,6 +35,10 @@ class ChatViewModel(private val context: Context, private val prefs: SharedPrefe
 
     private val scope = CoroutineScope(Dispatchers.Main)
     private val commandProcessor = CommandProcessor(context)
+
+    // Проверяем настройки голосового вывода
+    private val isVoiceEnabled: Boolean
+        get() = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("voice_enabled", false)
 
     fun sendMessage(text: String) {
         if (text.isBlank()) return
@@ -51,6 +61,11 @@ class ChatViewModel(private val context: Context, private val prefs: SharedPrefe
                 updatedMessages.add(jarvisMessage)
                 _messages.postValue(updatedMessages)
                 saveMessages(updatedMessages)
+
+                // Озвучиваем ответ Джарвиса, если голос включён
+                if (isVoiceEnabled) {
+                    textToSpeech.speak(response, TextToSpeech.QUEUE_FLUSH, null, null)
+                }
             }
         }
     }
@@ -85,15 +100,16 @@ class ChatViewModel(private val context: Context, private val prefs: SharedPrefe
     }
 }
 
-// Фабрика для создания ChatViewModel с Context и SharedPreferences
+// Фабрика для создания ChatViewModel с Context, SharedPreferences и TextToSpeech
 class ChatViewModelFactory(
     private val context: Context,
-    private val prefs: SharedPreferences
+    private val prefs: SharedPreferences,
+    private val textToSpeech: TextToSpeech
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ChatViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ChatViewModel(context, prefs) as T
+            return ChatViewModel(context, prefs, textToSpeech) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
