@@ -26,6 +26,8 @@ class CommandProcessor(private val context: Context) {
     private val wifiOffResponses by lazy { context.resources.getStringArray(R.array.wifi_off_responses).toList() }
     private val soundOffResponses by lazy { context.resources.getStringArray(R.array.sound_off_responses).toList() }
     private val soundOnResponses by lazy { context.resources.getStringArray(R.array.sound_on_responses).toList() }
+    private val flashlightOnResponses by lazy { context.resources.getStringArray(R.array.flashlight_on_responses).toList() }
+    private val flashlightOffResponses by lazy { context.resources.getStringArray(R.array.flashlight_off_responses).toList() }
 
     private val prefs by lazy { PreferenceManager.getDefaultSharedPreferences(context) }
     private val isSarcasmEnabled: Boolean get() = prefs.getBoolean("sarcasm_enabled", false)
@@ -49,6 +51,8 @@ class CommandProcessor(private val context: Context) {
             trimmedInput in listOf("выключи вайфай", "выключи wi-fi") -> deviceControlManager.toggleWifi(false, wifiOnResponses, wifiOffResponses)
             trimmedInput == "выключи звук" -> deviceControlManager.setMute(true, soundOffResponses, soundOnResponses)
             trimmedInput == "включи звук" -> deviceControlManager.setMute(false, soundOffResponses, soundOnResponses)
+            trimmedInput in listOf("включи фонарик", "включи свет") -> deviceControlManager.toggleFlashlight(true, flashlightOnResponses, flashlightOffResponses)
+            trimmedInput in listOf("выключи фонарик", "выключи свет") -> deviceControlManager.toggleFlashlight(false, flashlightOnResponses, flashlightOffResponses)
             else -> unknownResponses.random()
         }
 

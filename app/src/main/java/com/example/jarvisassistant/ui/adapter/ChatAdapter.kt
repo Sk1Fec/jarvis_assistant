@@ -89,8 +89,9 @@ class ChatAdapter(
                 holder.messageCard.cardElevation = 2f
 
                 val cardParams = holder.messageCard.layoutParams as ConstraintLayout.LayoutParams
-                cardParams.width = 0
+                cardParams.width = ConstraintLayout.LayoutParams.WRAP_CONTENT // Убрано ограничение на 0
                 cardParams.height = ConstraintLayout.LayoutParams.WRAP_CONTENT
+                cardParams.topMargin = if (position == 0) 16 else 4 // Отступ сверху для первого сообщения
 
                 val timestampParams = holder.timestampText.layoutParams as ConstraintLayout.LayoutParams
                 if (message.isSentByUser) {

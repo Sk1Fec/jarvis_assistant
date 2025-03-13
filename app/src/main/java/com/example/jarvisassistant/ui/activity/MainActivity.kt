@@ -1,8 +1,10 @@
 package com.example.jarvisassistant.ui.activity
 
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.Manifest
 import android.content.SharedPreferences
 import android.os.Bundle
@@ -17,10 +19,10 @@ import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.jarvisassistant.core.JarvisService
 import com.example.jarvisassistant.databinding.ActivityMainBinding
 import com.example.jarvisassistant.ui.adapter.ChatAdapter
 import com.example.jarvisassistant.viewmodel.ChatViewModel
-import com.example.jarvisassistant.R
 import com.example.jarvisassistant.viewmodel.ChatViewModelFactory
 import com.google.android.material.snackbar.Snackbar
 import android.view.inputmethod.InputMethodManager
@@ -30,7 +32,8 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import java.util.Locale
 import android.animation.ValueAnimator
-import android.view.View
+import androidx.preference.PreferenceManager
+import com.example.jarvisassistant.R
 
 class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
@@ -44,8 +47,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private var micPulseAnimator: ValueAnimator? = null
-    private var isMicActive = false // Флаг для отслеживания состояния микрофона
+    private var isMicActive = false
+    private var isContinuousListening = false
 
+    private val wittyMessageReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val message = intent?.getStringExtra("message") ?: return
+            viewModel.addWittyMessage(message)
+        }
+    }
+
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,13 +70,38 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         recognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
         }
+
+        registerReceiver(wittyMessageReceiver, IntentFilter("com.example.jarvisassistant.NEW_WITTY_MESSAGE"))
+
+        startJarvisService()
 
         setupRecyclerView()
         setupPermissions()
         setupListeners()
         setupAnimations()
+
+        if (intent.getBooleanExtra("ACTIVATED_BY_VOICE", false)) {
+            isContinuousListening = true
+            startListening()
+            textToSpeech.speak("Я здесь, господин! Что прикажете?", TextToSpeech.QUEUE_FLUSH, null, null)
+        }
+    }
+
+    private fun startJarvisService() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        if (!prefs.getBoolean("voice_recognition_enabled", true)) {
+            // Если голосовое распознавание отключено, не запускаем службу
+            return
+        }
+
+        val serviceIntent = Intent(this, JarvisService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
     }
 
     override fun onInit(status: Int) {
@@ -80,9 +117,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun setupRecyclerView() {
-        binding.chatRecyclerView.layoutManager = LinearLayoutManager(this).apply {
-            stackFromEnd = true
-        }
+        binding.chatRecyclerView.layoutManager = LinearLayoutManager(this).apply { stackFromEnd = true }
         binding.chatRecyclerView.adapter = chatAdapter
 
         viewModel.messages.observe(this) { messages ->
@@ -111,14 +146,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     .show()
             }
         }
-
-        PermissionManager.requestExactAlarmPermission(this) { granted ->
-            if (!granted) {
-                Snackbar.make(binding.root, "Точные напоминания требуют разрешения!", Snackbar.LENGTH_LONG)
-                    .setAction("Настройки") { openSettings() }
-                    .show()
-            }
-        }
     }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -137,17 +164,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         binding.settingsButton.setOnClickListener { openSettings() }
         binding.clearChatButton.setOnClickListener {
-            binding.chatRecyclerView.animate()
-                .alpha(0f)
-                .setDuration(300)
-                .withEndAction {
-                    viewModel.clearMessages {
-                        chatAdapter.notifyDataSetChanged()
-                        binding.chatRecyclerView.alpha = 1f
-                        Toast.makeText(this, "Чат очищен, господин!", Toast.LENGTH_SHORT).show()
-                    }
-                }
-                .start()
+            viewModel.clearMessages {
+                chatAdapter.notifyDataSetChanged()
+                Toast.makeText(this, "Чат очищен, господин!", Toast.LENGTH_SHORT).show()
+            }
         }
         binding.micButton.setOnClickListener {
             if (PermissionManager.checkPermission(this, Manifest.permission.RECORD_AUDIO)) {
@@ -162,38 +182,68 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         speechRecognizer.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
-                binding.messageInput.hint = "Говорите, господин..."
+                binding.messageInput.hint = "Слушаю вас, господин..."
                 startMicAnimation()
             }
+
             override fun onBeginningOfSpeech() {
-                binding.messageInput.hint = "Слушаю..."
+                binding.messageInput.hint = "Говорите..."
             }
+
             override fun onRmsChanged(rmsdB: Float) {
                 val scale = 1f + (rmsdB / 20f).coerceIn(0f, 0.5f)
                 binding.micButton.scaleX = scale
                 binding.micButton.scaleY = scale
             }
+
             override fun onBufferReceived(buffer: ByteArray?) {}
+
             override fun onEndOfSpeech() {
                 binding.messageInput.hint = "Команда для Jarvis"
                 stopMicAnimation()
-                isMicActive = false // Сбрасываем флаг
+                if (isContinuousListening) {
+                    Thread.sleep(500)
+                    startListening()
+                } else {
+                    isMicActive = false
+                }
             }
+
             override fun onError(error: Int) {
                 stopMicAnimation()
-                Toast.makeText(this@MainActivity, "Ошибка распознавания: $error", Toast.LENGTH_SHORT).show()
-                isMicActive = false // Сбрасываем флаг при ошибке
+                val errorMessage = when (error) {
+                    SpeechRecognizer.ERROR_NO_MATCH -> "Не услышал ничего полезного, господин. Попробуйте еще раз."
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Распознавание занято, перезапускаю через 1 сек..."
+                    else -> "Ошибка распознавания: $error"
+                }
+                Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
+                if (isContinuousListening) {
+                    Thread.sleep(1000)
+                    startListening()
+                } else {
+                    isMicActive = false
+                }
             }
+
             override fun onResults(results: Bundle?) {
                 stopMicAnimation()
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (!matches.isNullOrEmpty()) {
-                    val recognizedText = matches[0]
-                    binding.messageInput.setText(recognizedText)
-                    sendMessage()
+                    val recognizedText = matches[0].lowercase()
+                    if (recognizedText == "хватит" || recognizedText == "спасибо, джарвис" || recognizedText == "спасибо") {
+                        isContinuousListening = false
+                        isMicActive = false
+                        textToSpeech.speak("Всегда пожалуйста, господин!", TextToSpeech.QUEUE_FLUSH, null, null)
+                        binding.messageInput.hint = "Команда для Jarvis"
+                    } else {
+                        binding.messageInput.setText(recognizedText)
+                        sendMessage()
+                        isContinuousListening = false // Останавливаем после отправки
+                        isMicActive = false
+                    }
                 }
-                isMicActive = false // Сбрасываем флаг после результата
             }
+
             override fun onPartialResults(partialResults: Bundle?) {}
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
@@ -201,15 +251,29 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun toggleSpeechRecognition() {
         if (isMicActive) {
-            speechRecognizer.stopListening() // Останавливаем распознавание
+            speechRecognizer.stopListening()
             stopMicAnimation()
             binding.messageInput.hint = "Команда для Jarvis"
-            Toast.makeText(this, "Микрофон выключен, господин!", Toast.LENGTH_SHORT).show()
             isMicActive = false
+            isContinuousListening = false
+            textToSpeech.speak("До встречи, господин!", TextToSpeech.QUEUE_FLUSH, null, null)
         } else {
-            speechRecognizer.startListening(recognizerIntent)
-            Toast.makeText(this, "Говорите, господин!", Toast.LENGTH_SHORT).show()
+            isContinuousListening = true
+            startListening()
             isMicActive = true
+        }
+    }
+
+    private fun startListening() {
+        try {
+            if (!SpeechRecognizer.isRecognitionAvailable(this)) { // Исправлено: используем статический метод
+                Toast.makeText(this, "Распознавание недоступно", Toast.LENGTH_SHORT).show()
+                return
+            }
+            speechRecognizer.startListening(recognizerIntent)
+            startMicAnimation()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Ошибка при запуске прослушивания: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -265,6 +329,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             viewModel.sendMessage(input)
             binding.messageInput.text.clear()
             hideKeyboard()
+            // Останавливаем прослушивание после отправки
+            if (isMicActive) {
+                speechRecognizer.stopListening()
+                stopMicAnimation()
+                isMicActive = false
+                isContinuousListening = false
+                textToSpeech.speak("Команда принята, жду следующей!", TextToSpeech.QUEUE_FLUSH, null, null)
+            }
         }
     }
 
@@ -294,10 +366,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        unregisterReceiver(wittyMessageReceiver)
         textToSpeech.stop()
         textToSpeech.shutdown()
         speechRecognizer.destroy()
         micPulseAnimator?.cancel()
-        if (isMicActive) speechRecognizer.stopListening() // Останавливаем при уничтожении активности
+        if (isMicActive) speechRecognizer.stopListening()
     }
 }

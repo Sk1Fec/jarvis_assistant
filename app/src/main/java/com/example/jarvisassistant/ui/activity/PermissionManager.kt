@@ -18,8 +18,9 @@ object PermissionManager {
         Manifest.permission.INTERNET,
         Manifest.permission.CHANGE_WIFI_STATE,
         Manifest.permission.MODIFY_AUDIO_SETTINGS,
-        Manifest.permission.POST_NOTIFICATIONS, // Для Android 13+
-        Manifest.permission.RECORD_AUDIO // Добавляем разрешение на микрофон
+        Manifest.permission.POST_NOTIFICATIONS,
+        Manifest.permission.RECORD_AUDIO,
+        Manifest.permission.CAMERA // Добавлено для фонарика
     )
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)

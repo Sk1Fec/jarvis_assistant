@@ -49,4 +49,16 @@
         <item>Громкость включена, сэр, что послушаем?</item>
         <item>Звук готов, наслаждайтесь!</item>
     </string-array>
+
+    <string-array name="flashlight_on_responses">
+        <item>Свет врублен, господин, теперь вы не в темноте!</item>
+        <item>Фонарик горит, сэр, освещаю ваш путь!</item>
+        <item>Свет активирован, что дальше?</item>
+    </string-array>
+
+    <string-array name="flashlight_off_responses">
+        <item>Фонарик выключен, господин, возвращаемся в тень!</item>
+        <item>Свет потушен, сэр, бережем батарею!</item>
+        <item>Темнота вернулась, что еще сделать?</item>
+    </string-array>
 </resources>

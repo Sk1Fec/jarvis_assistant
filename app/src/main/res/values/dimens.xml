@@ -1,0 +1,4 @@
+<resources>
+    <!-- Высота тулбара с учетом кнопок и отступов -->
+    <dimen name="toolbar_height">80dp</dimen>
+</resources>

@@ -3,6 +3,7 @@ package com.example.jarvisassistant.core
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.net.wifi.WifiManager
 import android.os.Build
@@ -15,6 +16,7 @@ import com.example.jarvisassistant.ui.activity.PermissionManager
 class DeviceControlManager(private val context: Context) {
 
     private val TAG = "DeviceControlManager"
+    private var isFlashlightOn = false // Флаг состояния фонарика
 
     @RequiresApi(Build.VERSION_CODES.M)
     fun toggleWifi(enable: Boolean, wifiOnResponses: List<String>, wifiOffResponses: List<String>): String {
@@ -31,14 +33,12 @@ class DeviceControlManager(private val context: Context) {
             val currentState = wifiManager.isWifiEnabled
             if (currentState != enable) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    // Для Android 10+ открываем панель настроек Wi-Fi
                     val intent = Intent(Settings.Panel.ACTION_WIFI)
                     context.startActivity(intent)
                     return "Господин, включите или выключите Wi-Fi в настройках!"
                 } else {
-                    // Для Android 9 и ниже прямое управление
                     wifiManager.isWifiEnabled = enable
-                    Thread.sleep(1000) // Ждем изменения состояния
+                    Thread.sleep(1000)
                     val newState = wifiManager.isWifiEnabled
                     return if (newState == enable) {
                         if (enable) wifiOnResponses.random() else wifiOffResponses.random()
@@ -93,6 +93,31 @@ class DeviceControlManager(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected error in setMute: ${e.message}")
             return "Звук не хочет слушаться, господин! Проверь настройки."
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.M)
+    fun toggleFlashlight(enable: Boolean, flashlightOnResponses: List<String>, flashlightOffResponses: List<String>): String {
+        val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        if (!PermissionManager.checkPermission(context, Manifest.permission.CAMERA)) {
+            PermissionManager.requestPermissions(context as AppCompatActivity) { granted ->
+                if (!granted) Log.w(TAG, "Camera permission denied")
+            }
+            return "Дай разрешение на камеру, господин, иначе фонарик не включить!"
+        }
+
+        try {
+            val cameraId = cameraManager.cameraIdList[0] // Берем первую камеру (обычно задняя)
+            if (enable != isFlashlightOn) {
+                cameraManager.setTorchMode(cameraId, enable)
+                isFlashlightOn = enable
+                return if (enable) flashlightOnResponses.random() else flashlightOffResponses.random()
+            } else {
+                return if (enable) "Фонарик уже светит, господин!" else "Фонарик уже выключен, господин!"
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in toggleFlashlight: ${e.message}")
+            return "Не удалось ${if (enable) "включить" else "выключить"} фонарик, господин!"
         }
     }
 }

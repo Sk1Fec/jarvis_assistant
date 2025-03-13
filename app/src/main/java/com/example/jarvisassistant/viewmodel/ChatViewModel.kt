@@ -8,6 +8,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.preference.PreferenceManager
 import com.example.jarvisassistant.R
 import com.example.jarvisassistant.core.CommandProcessor
 import com.example.jarvisassistant.data.Message
@@ -20,7 +21,6 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import android.preference.PreferenceManager
 import kotlin.math.max
 
 class ChatViewModel(
@@ -29,7 +29,11 @@ class ChatViewModel(
     private val textToSpeech: TextToSpeech
 ) : ViewModel() {
 
-    private val _messages = MutableLiveData<MutableList<Message>>(loadMessages())
+    companion object {
+        const val MAX_MESSAGES = 50 // Ограничение на количество сообщений
+    }
+
+    private val _messages = MutableLiveData<MutableList<Message>>(loadMessages().takeLast(MAX_MESSAGES).toMutableList())
     val messages: LiveData<MutableList<Message>> get() = _messages
 
     private val _isTyping = MutableLiveData<Boolean>(false)
@@ -47,6 +51,7 @@ class ChatViewModel(
         val userMessage = Message("${context.getString(R.string.user_prefix)}$text", true, System.currentTimeMillis())
         val currentMessages = _messages.value ?: mutableListOf()
         currentMessages.add(userMessage)
+        if (currentMessages.size > MAX_MESSAGES) currentMessages.removeAt(0) // Удаляем старое сообщение
         _messages.postValue(currentMessages)
 
         _isTyping.postValue(true)
@@ -54,7 +59,7 @@ class ChatViewModel(
 
         scope.launch(Dispatchers.IO) {
             val response = commandProcessor.process(text)
-            val delayTime = maxOf(500L, response.length * 10L) // 10 мс на символ, минимум 500 мс
+            val delayTime = maxOf(500L, response.length * 10L)
             delay(delayTime)
             launch(Dispatchers.Main) {
                 _isTyping.postValue(false)
@@ -62,6 +67,7 @@ class ChatViewModel(
                 val jarvisMessage = Message("${context.getString(R.string.jarvis_prefix)}$response", false, System.currentTimeMillis())
                 val updatedMessages = _messages.value ?: mutableListOf()
                 updatedMessages.add(jarvisMessage)
+                if (updatedMessages.size > MAX_MESSAGES) updatedMessages.removeAt(0)
                 _messages.postValue(updatedMessages)
                 saveMessages(updatedMessages)
 
@@ -72,13 +78,27 @@ class ChatViewModel(
         }
     }
 
+    fun addWittyMessage(message: String) {
+        val jarvisMessage = Message("${context.getString(R.string.jarvis_prefix)}$message", false, System.currentTimeMillis())
+        val updatedMessages = _messages.value ?: mutableListOf()
+        updatedMessages.add(jarvisMessage)
+        if (updatedMessages.size > MAX_MESSAGES) updatedMessages.removeAt(0)
+        _messages.postValue(updatedMessages)
+        saveMessages(updatedMessages)
+
+        if (isVoiceEnabled) {
+            textToSpeech.speak(message, TextToSpeech.QUEUE_ADD, null, null)
+        }
+    }
+
     fun clearMessages(onCleared: () -> Unit = {}) {
-        _messages.postValue(mutableListOf())
-        saveMessages(emptyList())
+        val emptyList = mutableListOf<Message>()
+        _messages.postValue(emptyList)
+        saveMessages(emptyList)
         onCleared()
     }
 
-    private fun loadMessages(): MutableList<Message> {
+    private fun loadMessages(): List<Message> {
         val savedMessages = prefs.getString("messages", null)?.let { json ->
             try {
                 val type = object : TypeToken<MutableList<Message>>() {}.type
@@ -92,7 +112,7 @@ class ChatViewModel(
     }
 
     private fun saveMessages(messages: List<Message>) {
-        val json = Gson().toJson(messages)
+        val json = Gson().toJson(messages.takeLast(MAX_MESSAGES)) // Сохраняем только последние MAX_MESSAGES
         prefs.edit().putString("messages", json).apply()
     }
 
